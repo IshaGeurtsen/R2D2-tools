@@ -1,3 +1,11 @@
+"""
+this program takes the apikey and username from the config file 
+and compiles a list of commits authored by that user.
+
+currently this program is time and api access intensive, and does not store partial nor complete results
+but writes directly to stdout
+"""
+
 from configparser import ConfigParser
 from github import Github
 import logging
