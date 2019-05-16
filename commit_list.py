@@ -7,15 +7,46 @@ but writes directly to stdout
 """
 
 from configparser import ConfigParser
-from github import Github
+import github
 import logging
 
-config = ConfigParser()
-config.read('config.ini')
-apikey = config['pygithub']['key']
-username = config['author']['name']
+logging.basicConfig(level=logging.INFO)
 
-g = Github(apikey)
+APIKEY: str
+USERNAME : str
+
+def authenticate():
+    global APIKEY, USERNAME
+    config = ConfigParser()
+    config.read('config.ini')
+    config['DEFAULT'] = {'apikey':'', 'username':''}
+    APIKEY = config['commit_list']['apikey']
+    USERNAME = config['commit_list']['username']
+    if APIKEY:
+        # authenticate with api key
+        g = github.Github(APIKEY)
+    else:
+        # authenticate with username and password'
+        logging.warning('no api key provided, please login with github credentials')
+        import getpass
+        USERNAME = input("username > ")
+        g = github.Github(USERNAME, getpass.getpass())
+    try:
+        lim=g.get_rate_limit()
+    except github.BadCredentialsException:
+        logging.fatal('invalid credentials')
+        exit(1)
+    else:
+        if lim.core.limit == 60:
+            logging.fatal('unauthenticated user')
+            exit(1)
+        if lim.core.remaining < 2000:
+            logging.fatal('insufficient api calls remaining')
+            logging.fatal(f'api calls reset on {lim.core.reset}.')
+            exit()
+    return g
+
+g: github.Github = authenticate()
 
 commits = list()
 
@@ -45,7 +76,7 @@ if __name__ == "__main__":
     get_branch_commits()
     get_parents()
 
-    filtered = list(filter((lambda commit: commit.author.name == username if commit.author else False), commits))
+    filtered = list(filter((lambda commit: commit.author.name == USERNAME if commit.author else False), commits))
 
     filtered.sort(key=(lambda commit: commit.commit.author.date))
 
